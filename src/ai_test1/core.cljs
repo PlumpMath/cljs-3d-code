@@ -1,6 +1,4 @@
-(ns ai-test1.core)
-
-(ns three-cljs.core
+(ns ai-test1.core
   (:require-macros [macros.core :as mac])
   (:require [ai.core :as ai]))
 
