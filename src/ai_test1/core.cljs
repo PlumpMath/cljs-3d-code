@@ -1,6 +1,5 @@
 (ns ai-test1.core
-  (:require-macros [macros.core :as mac])
-  (:require [ai.core :as ai]))
+  (:require-macros [macros.core :as mac]))
 
 (mac/vars container
          scene
@@ -101,23 +100,25 @@
   (.log js/console o))
 
 (def test-count (atom 1))
+(def up-count (atom 1))
+(def left-count (atom 1))
 
 (mac/defaction up-down-left [mv-distance]
   {:name "up" :behavior (fn []
                           (mac/-= (-> EnemyCube .-position .-z) mv-distance)
-                          (reset! test-count (+ @test-count 1)))
-   :end-cond #(>= @test-count 20)
-   :next "down"}
+                          (reset! test-count (+ @test-count 1))
+                          (reset! up-count (+ @up-count 1)))
+   :end-cnd #(>= @test-count 20)
+   :next-bh "down"}
   {:name "down" :behavior (fn []
                             (mac/+= (-> EnemyCube .-position .-z) mv-distance)
                             (reset! test-count (- @test-count 1)))
-   :end-cond #(<= @test-count 0)
-   :next "left"}
+   :end-cnd #(<= @test-count 0) :next-bh "left"}
   {:name "left" :behavior (fn []
                             (mac/-= (-> EnemyCube .-position .-x) mv-distance)
                             (reset! test-count (- @test-count 1)))
-   :end-cond #(<= @test-count -20)
-   :next "up"})
+   :multi-cnd [{:end-cnd #(>= @up-count 100) :next-bh "down"}
+                {:end-cnd #(<= @test-count -20) :next-bh "up"}]})
 
 (defn update []
   (let [colli-lst (collision MovingCube collidableMeshList)
@@ -138,7 +139,8 @@
       (mac/+= (-> MovingCube .-position .-z) moveDistance))
     (when (collision? colli-lst)
       (log "collision"))
-    (up-down-left moveDistance)))
+    (up-down-left moveDistance)
+    ))
 
 (defn render []
   (.render renderer scene camera))
