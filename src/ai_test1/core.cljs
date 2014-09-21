@@ -108,8 +108,7 @@
                           (mac/-= (-> EnemyCube .-position .-z) mv-distance)
                           (reset! test-count (+ @test-count 1))
                           (reset! up-count (+ @up-count 1)))
-   :end-cnd #(>= @test-count 20)
-   :next-bh "down"}
+   :end-cnd #(>= @test-count 20) :next-bh "down"}
   {:name "down" :behavior (fn []
                             (mac/+= (-> EnemyCube .-position .-z) mv-distance)
                             (reset! test-count (- @test-count 1)))
@@ -118,7 +117,7 @@
                             (mac/-= (-> EnemyCube .-position .-x) mv-distance)
                             (reset! test-count (- @test-count 1)))
    :multi-cnd [{:end-cnd #(>= @up-count 100) :next-bh "down"}
-                {:end-cnd #(<= @test-count -20) :next-bh "up"}]})
+               {:end-cnd #(<= @test-count -20) :next-bh "up"}]})
 
 (defn update []
   (let [colli-lst (collision MovingCube collidableMeshList)
