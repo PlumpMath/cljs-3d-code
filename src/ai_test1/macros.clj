@@ -26,7 +26,7 @@
             (second (first clauses))
             (throw (IllegalArgumentException.
                     "cond requires an even number of forms")))
-          (cons 'my-cond (next clauses)))))
+          (cons 'macros.core/my-cond (next clauses)))))
 
 (defn make-cond [state-var multi-cnd]
   `(my-cond
@@ -62,5 +62,4 @@
        (atom ~(symbol (:name (first behaviors)))))
      (defn ~(symbol name) ~args-vec
        ((deref ~(symbol (str name "-state"))) ~@args-vec))))
-
 
