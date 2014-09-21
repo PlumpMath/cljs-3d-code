@@ -28,6 +28,11 @@
                     "cond requires an even number of forms")))
           (cons 'macros.core/my-cond (next clauses)))))
 
+(comment 
+  (my-cond [(= 1 3) 3]
+           [(= 1 2) 2]
+           [(= 1 1) 1]))
+
 (defn make-cond [state-var multi-cnd]
   `(my-cond
     ~@(for [cnd multi-cnd]
@@ -62,4 +67,3 @@
        (atom ~(symbol (:name (first behaviors)))))
      (defn ~(symbol name) ~args-vec
        ((deref ~(symbol (str name "-state"))) ~@args-vec))))
-
