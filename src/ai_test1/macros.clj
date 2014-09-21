@@ -19,6 +19,7 @@
       `(declare ~next-bh))))
 
 (defmacro my-cond
+  "For make-cond"
   [& clauses]
   (when clauses
     (list 'if (first (first clauses))
