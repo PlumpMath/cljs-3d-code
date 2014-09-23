@@ -63,25 +63,6 @@
      (defn ~(symbol name) ~args-vec
        ((deref ~(symbol (str name "-state"))) ~@args-vec))))
 
-(defaction obj :up-down []
-  {:bh printlnx})
-
-:up {:bhavior (fn []
-                 (mac/-= (-> EnemyCube .-position .-z) mv-distance)
-                 (reset! test-count (+ @test-count 1))
-                 (reset! up-count (+ @up-count 1)))
-     :end-cnd #(>= @test-count 20)
-     :next-bh "down"}
-:down {:behavior (fn []
-                   (mac/+= (-> EnemyCube .-position .-z) mv-distance)
-                   (reset! test-count (- @test-count 1)))
-       :end-cnd #(<= @test-count 0) :next-bh "left"}
-:left {:behavior (fn []
-                   (mac/-= (-> EnemyCube .-position .-x) mv-distance)
-                   (reset! test-count (- @test-count 1)))
-       :multi-cnd [{:end-cnd #(>= @up-count 100) :next-bh "down"}
-                   {:end-cnd #(<= @test-count -20) :next-bh "up"}]}
-
 (defmacro let-map
    "Equivalent of (let [a 5 b (+ a 5)] {:a a :b b})."
    [kvs]
@@ -89,26 +70,6 @@
          keyword-symbols (mapcat #(vector (keyword (str %)) %) keys)]
    `(let [~@kvs]
       (hash-map ~@keyword-symbols))))
-
-(let-map [count (atom 0)
-          count-up (fn [] (reset! count (+ @count 1)))
-          count-down (fn [] (reset! count (- @count 1)))
-          up   {:behavior (fn [] 
-                           (count-up)
-                           (println "up"))
-                :end-cnd #(>= @count 10) :next-state :down}
-          down {:behavior (fn [] 
-                           (count-down)
-                           (println "down"))
-                :end-cnd #(< @count 0) :next-state :up}
-          state (atom up)
-          action (fn [this]
-                   (let [bhv (:behavior @state)
-                         end-cnd (:end-cnd @state)
-                         next-state ((:next-state @state) this)]
-                     (bhv)
-                     (if (end-cnd)
-                       (reset! state next-state))))])
 
 (let-map [count (atom 0)
           count-all (atom 0)
