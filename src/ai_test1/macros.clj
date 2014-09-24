@@ -82,7 +82,6 @@
        ;update state
        (if multi-cnd
          (loop [cnd-vec multi-cnd]
-           (println cnd-vec)
            (if (not (first cnd-vec))
              nil
              (let [cnd (first cnd-vec)
@@ -101,16 +100,17 @@
                ~(symbol "state") (atom ~(symbol "up"))
                ~(symbol "action") ~(action-code)]))))
 
-(defmacro defenemy [name args-vec slots]
+(defmacro defenemy [name args-vec first-state slots]
   `(defn ~(symbol name) ~args-vec
      (let-map [~@slots
-               ~(symbol "state") (atom ~(symbol "up"))
+               ~(symbol "state") (atom ~(symbol first-state))
                ~(symbol "action") ~(action-code)])))
 
 (defn action [obj]
   ((:action obj) obj))
 
-(defenemy test-enemy [my-string]
+(comment
+  (defenemy test-enemy [my-string] "down"
   [print-my-str (fn [] (println my-string))
    count (atom 0)
    count-all (atom 0)
@@ -132,4 +132,4 @@
          :multi-cnd  [{:end-cnd #(< @count 0) :next-state :up}
                       {:end-cnd #(>= @count-all 30) :next-state :strange}]}
    strange {:behavior (fn [] (println "strange"))
-            :end-cnd (fn [] nil)}])
+            :end-cnd (fn [] nil)}]))
