@@ -64,53 +64,72 @@
        ((deref ~(symbol (str name "-state"))) ~@args-vec))))
 
 (defmacro let-map
-   "Equivalent of (let [a 5 b (+ a 5)] {:a a :b b})."
-   [kvs]
-   (let [keys (keys (apply hash-map kvs))
-         keyword-symbols (mapcat #(vector (keyword (str %)) %) keys)]
-   `(let [~@kvs]
-      (hash-map ~@keyword-symbols))))
+  "Equivalent of (let [a 5 b (+ a 5)] {:a a :b b})."
+  [kvs]
+  (let [keys (keys (apply hash-map kvs))
+        keyword-symbols (mapcat #(vector (keyword (str %)) %) keys)]
+    `(let [~@kvs]
+       (hash-map ~@keyword-symbols))))
 
-(let-map [count (atom 0)
-          count-all (atom 0)
-          count-up (fn [] 
-                     (reset! count (+ @count 1))
-                     (reset! count-all (+ @count-all 1)))
-          count-down (fn [] 
-                       (reset! count (- @count 1))
-                       (reset! count-all (+ @count-all 1)))
-          up   {:behavior (fn [] 
-                           (count-up)
-                           (println "up"))
-                :end-cnd #(>= @count 10) :next-state :down}
-          down {:behavior (fn [] 
-                           (count-down)
-                           (println "down"))
-                :multi-cnd  [{:end-cnd #(< @count 0) :next-state :up}
-                             {:end-cnd #(>= @count-all 30) :next-state :strange}]}
-          strange {:behavior (fn [] (println "strange"))
-                   :end-cnd (fn [] nil)}
-          state (atom up)
-          action (fn [this]
-                   (let [bhv (:behavior @state)
-                         end-cnd (:end-cnd @state)
-                         next-state (if (:next-state @state) ((:next-state @state) this))
-                         multi-cnd (:multi-cnd @state)]
-                     (bhv)
-                     ;update state
-                     (if multi-cnd
-                       (loop [cnd-vec multi-cnd]
-                         (println cnd-vec)
-                          (if (not (first cnd-vec))
-                            nil
-                            (let [cnd (first cnd-vec)
-                                  end-cnd (:end-cnd cnd)
-                                  next-state ((:next-state cnd) this)]
-                              (if (end-cnd)
-                                (reset! state next-state))
-                              (recur (rest cnd-vec)))))
-                       (if (end-cnd)
-                         (reset! state next-state)))))])
+(defn action-code []
+  '(fn [this]
+     (let [bhv (:behavior @state)
+           end-cnd (:end-cnd @state)
+           next-state (if (:next-state @state) 
+                        ((:next-state @state) this))
+           multi-cnd (:multi-cnd @state)]
+       (bhv)
+       ;update state
+       (if multi-cnd
+         (loop [cnd-vec multi-cnd]
+           (println cnd-vec)
+           (if (not (first cnd-vec))
+             nil
+             (let [cnd (first cnd-vec)
+                   end-cnd (:end-cnd cnd)
+                   next-state ((:next-state cnd) this)]
+               (if (end-cnd)
+                 (reset! state next-state))
+               (recur (rest cnd-vec)))))
+         (if (end-cnd)
+           (reset! state next-state))))))
+
+(comment
+  (defmacro defenemy [name slots]
+  `(defn ~(symbol name) []
+     (let-map [~@slots
+               ~(symbol "state") (atom ~(symbol "up"))
+               ~(symbol "action") ~(action-code)]))))
+
+(defmacro defenemy [name args-vec slots]
+  `(defn ~(symbol name) ~args-vec
+     (let-map [~@slots
+               ~(symbol "state") (atom ~(symbol "up"))
+               ~(symbol "action") ~(action-code)])))
 
 (defn action [obj]
   ((:action obj) obj))
+
+(defenemy test-enemy [my-string]
+  [print-my-str (fn [] (println my-string))
+   count (atom 0)
+   count-all (atom 0)
+   count-up (fn [] 
+              (reset! count (+ @count 1))
+              (reset! count-all (+ @count-all 1)))
+   count-down (fn [] 
+                (reset! count (- @count 1))
+                (reset! count-all (+ @count-all 1)))
+   up   {:behavior (fn [] 
+                     (count-up)
+                     (println "up")
+                     (print-my-str))
+         :end-cnd #(>= @count 10) :next-state :down}
+   down {:behavior (fn [] 
+                     (count-down)
+                     (println "down")
+                     (print-my-str))
+         :multi-cnd  [{:end-cnd #(< @count 0) :next-state :up}
+                      {:end-cnd #(>= @count-all 30) :next-state :strange}]}
+   strange {:behavior (fn [] (println "strange"))
+            :end-cnd (fn [] nil)}])
