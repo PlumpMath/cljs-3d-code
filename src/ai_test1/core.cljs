@@ -11,72 +11,76 @@
          (clock (THREE.Clock.))
          (keyboard (THREEx.KeyboardState.))
          MovingCube
-         EnemyCube
+         EnemyCube1
+         EnemyCube2
          (collidableMeshList (array))
          (arrowList (array))
          (directionList (array)))
 
-(defn init []
-  (mac/vars (scene (THREE.Scene.))
-	;CAMERA
-	         (SCREEN_WIDTH (.-innerWidth js/window))
-           (SCREEN_HEIGHT (.-innerHeight js/window))
-	         (VIEW_ANGLE 45)
-           (ASPECT (/ SCREEN_WIDTH SCREEN_HEIGHT))
-           (NEAR 0.1)
-           (FAR 20000))
-  (set! camera
-        (doto (THREE.PerspectiveCamera. VIEW_ANGLE ASPECT NEAR FAR) ;create camera
-	        (.position.set 0 150 400)
-	        (.lookAt (.-position scene))))
-  (.add scene camera)
-  ;RENDERER
-	(set! renderer (THREE.WebGLRenderer. (js* "{antialias:true}")))
-	(.setSize renderer SCREEN_WIDTH SCREEN_HEIGHT)
-	(set! container (.getElementById js/document "ThreeJS"))
-  (.appendChild container (.-domElement renderer))
-	;LIGHT
-	(set! light (THREE.PointLight. (js* "0xffffff")))
-	(.position.set light 0 250 0)
-	(.add scene light)
-	;FLOOR dd
-	(mac/vars (floorMaterial (THREE.MeshBasicMaterial. (js* "{color:0x444444, side:THREE.DoubleSide}")))
-	         (floorGeometry (THREE.PlaneGeometry. 1000 1000 10 10))
-	         (floor (THREE.Mesh. floorGeometry floorMaterial)))
-	(-> floor .-position .-y (set! -0.5))
-	(-> floor .-rotation .-x (set! (/ Math.PI 2)))
-	(.add scene floor)
-	;SKYBOX/FOG
-	(mac/vars (skyBoxGeometry (THREE.CubeGeometry. 10000 10000 10000))
-	         (skyBoxMaterial (THREE.MeshBasicMaterial. (js* "{color: 0x9999ff, side: THREE.BackSide}")))
-	         (skyBox (THREE.Mesh. skyBoxGeometry skyBoxMaterial)))
-	(.add scene skyBox)
-  ;CUSTO
-  (mac/vars (cubeGeometry (THREE.CubeGeometry. 50 50 50 1 1 1))
-	         (wireMaterial (THREE.MeshBasicMaterial. (js* "{ color: 0xff0000, wireframe:true }"))))
-	(set! MovingCube (THREE.Mesh. cubeGeometry wireMaterial))
-	(-> MovingCube .-position (set! (THREE.Vector3. 0 25.1 0)))
-	(.add scene MovingCube)
-  ;enemy cube
-  (set! EnemyCube (THREE.Mesh. cubeGeometry wireMaterial))
-	(-> EnemyCube .-position (set! (THREE.Vector3. 0 55.1 0)))
-	(.add scene EnemyCube)
-	(mac/vars (wallGeometry (THREE.CubeGeometry. 100 100 20 1 1 1))
-	         (wallMaterial (THREE.MeshLambertMaterial. (js* "{ color: 0xffffff}")))
-	         (wireMaterial (THREE.MeshLambertMaterial. (js* "{ color: 0xffffff}")))
-           (wall (THREE.Mesh. wallGeometry wallMaterial)))
-  (-> wall .-position (set! (THREE.Vector3. 100 50 -100)))
-	(.add scene wall)
-	(.push collidableMeshList wall)
 
-	(def wall2 (THREE.Mesh. wallGeometry wallMaterial))
-  (-> wall2 .-position (set! (THREE.Vector3. -150 50 0)))
-  (set! (-> wall2 .-rotation .-y)  (/ 3.14159 2))
+(mac/vars (scene (THREE.Scene.))
+          ;CAMERA
+          (SCREEN_WIDTH (.-innerWidth js/window))
+          (SCREEN_HEIGHT (.-innerHeight js/window))
+          (VIEW_ANGLE 45)
+          (ASPECT (/ SCREEN_WIDTH SCREEN_HEIGHT))
+          (NEAR 0.1)
+          (FAR 20000))
+(set! camera
+      (doto (THREE.PerspectiveCamera. VIEW_ANGLE ASPECT NEAR FAR) ;create camera
+        (.position.set 0 150 400)
+        (.lookAt (.-position scene))))
+(.add scene camera)
+;RENDERER
+(set! renderer (THREE.WebGLRenderer. (js* "{antialias:true}")))
+(.setSize renderer SCREEN_WIDTH SCREEN_HEIGHT)
+(set! container (.getElementById js/document "ThreeJS"))
+(.appendChild container (.-domElement renderer))
+;LIGHT
+(set! light (THREE.PointLight. (js* "0xffffff")))
+(.position.set light 0 250 0)
+(.add scene light)
+;FLOOR dd
+(mac/vars (floorMaterial (THREE.MeshBasicMaterial. (js* "{color:0x444444, side:THREE.DoubleSide}")))
+          (floorGeometry (THREE.PlaneGeometry. 1000 1000 10 10))
+          (floor (THREE.Mesh. floorGeometry floorMaterial)))
+(-> floor .-position .-y (set! -0.5))
+(-> floor .-rotation .-x (set! (/ Math.PI 2)))
+(.add scene floor)
+;SKYBOX/FOG
+(mac/vars (skyBoxGeometry (THREE.CubeGeometry. 10000 10000 10000))
+          (skyBoxMaterial (THREE.MeshBasicMaterial. (js* "{color: 0x9999ff, side: THREE.BackSide}")))
+          (skyBox (THREE.Mesh. skyBoxGeometry skyBoxMaterial)))
+(.add scene skyBox)
+;CUSTO
+(mac/vars (cubeGeometry (THREE.CubeGeometry. 50 50 50 1 1 1))
+          (wireMaterial (THREE.MeshBasicMaterial. (js* "{ color: 0xff0000, wireframe:true }"))))
+(set! MovingCube (THREE.Mesh. cubeGeometry wireMaterial))
+(-> MovingCube .-position (set! (THREE.Vector3. 0 25.1 0)))
+(.add scene MovingCube)
+;enemy cube
+(set! EnemyCube1 (THREE.Mesh. cubeGeometry wireMaterial))
+(-> EnemyCube1 .-position (set! (THREE.Vector3. 50 25.1 0)))
+(.add scene EnemyCube1)
+(set! EnemyCube2 (THREE.Mesh. cubeGeometry wireMaterial))
+(-> EnemyCube2 .-position (set! (THREE.Vector3. 300 25.1 30)))
+(.add scene EnemyCube2)
+(mac/vars (wallGeometry (THREE.CubeGeometry. 100 100 20 1 1 1))
+          (wallMaterial (THREE.MeshLambertMaterial. (js* "{ color: 0xffffff}")))
+          (wireMaterial (THREE.MeshLambertMaterial. (js* "{ color: 0xffffff}")))
+          (wall (THREE.Mesh. wallGeometry wallMaterial)))
+(-> wall .-position (set! (THREE.Vector3. 100 50 -100)))
+(.add scene wall)
+(.push collidableMeshList wall)
 
-	(.add scene wall2)
-	(.push collidableMeshList wall2)
+(def wall2 (THREE.Mesh. wallGeometry wallMaterial))
+(-> wall2 .-position (set! (THREE.Vector3. -150 50 0)))
+(set! (-> wall2 .-rotation .-y)  (/ 3.14159 2))
 
-  (.add MovingCube camera))
+(.add scene wall2)
+(.push collidableMeshList wall2)
+
+(.add MovingCube camera)
 
 (defn collision [moving meshlist]
   (let [originPoint (-> moving .-position .clone)
@@ -99,16 +103,13 @@
 (defn log [o]
   (.log js/console o))
 
-(def test-count (atom 1))
-(def up-count (atom 1))
-(def left-count (atom 1))
-
-(mac/defaction up-down-left [mv-distance]
+(comment (mac/defaction up-down-left [mv-distance]
   {:name "up" :behavior (fn []
                           (mac/-= (-> EnemyCube .-position .-z) mv-distance)
                           (reset! test-count (+ @test-count 1))
                           (reset! up-count (+ @up-count 1)))
-   :end-cnd #(>= @test-count 20) :next-bh "down"}
+   :end-cnd #(>= @test-count 20)
+   :next-bh "down"}
   {:name "down" :behavior (fn []
                             (mac/+= (-> EnemyCube .-position .-z) mv-distance)
                             (reset! test-count (- @test-count 1)))
@@ -117,7 +118,42 @@
                             (mac/-= (-> EnemyCube .-position .-x) mv-distance)
                             (reset! test-count (- @test-count 1)))
    :multi-cnd [{:end-cnd #(>= @up-count 100) :next-bh "down"}
-               {:end-cnd #(<= @test-count -20) :next-bh "up"}]})
+                {:end-cnd #(<= @test-count -20) :next-bh "up"}]}))
+
+(mac/defenemy test-enemy [three-obj] "up"
+  [test-count (atom 1)
+   up-count (atom 1)
+   count-up (fn [] (reset! test-count (+ @test-count 1)))
+   count-down (fn [] (reset! test-count (- @test-count 1)))
+   up-count-up (fn [] (reset! up-count (+ @up-count 1)))
+   mv-distance (atom nil)
+   set-mv-distance (fn [value] (reset! mv-distance value))
+   up {:behavior (fn []
+                   (mac/-= (-> three-obj .-position .-z) @mv-distance)
+                   (count-up)
+                   (up-count-up))
+       :end-cnd (fn [] (key-pressed "Z")) :next-state :down}
+   down {:behavior (fn []
+                     (mac/+= (-> three-obj .-position .-z) @mv-distance)
+                     (count-down))
+         :end-cnd #(<= @test-count 0) :next-state :left}
+   left {:behavior (fn []
+                     (mac/-= (-> three-obj .-position .-x) @mv-distance)
+                     (count-down))
+         :multi-cnd [{:end-cnd #(>= @up-count 100) :next-state :down}
+                     {:end-cnd #(<= @test-count -20) :next-state :up}]}])
+
+(comment (>= @test-count 20))
+
+(def test-obj1 (test-enemy EnemyCube1))
+(def test-obj2 (test-enemy EnemyCube2))
+
+(defn action [obj]
+  ((:action obj) obj))
+
+(defn update-test-enemy [obj mv-distance]
+  ((:set-mv-distance obj) mv-distance)
+  (action obj))
 
 (defn update []
   (let [colli-lst (collision MovingCube collidableMeshList)
@@ -138,7 +174,9 @@
       (mac/+= (-> MovingCube .-position .-z) moveDistance))
     (when (collision? colli-lst)
       (log "collision"))
-    (up-down-left moveDistance)
+    (update-test-enemy test-obj1 moveDistance)
+    (update-test-enemy test-obj2 (+ moveDistance 50))
+    ;(up-down-left moveDistance)
     ))
 
 (defn render []
@@ -149,5 +187,5 @@
   (render)
   (update))
 
-(init)
 (animate)
+(log EnemyCube2)
