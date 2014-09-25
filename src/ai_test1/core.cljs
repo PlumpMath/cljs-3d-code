@@ -2,21 +2,20 @@
   (:require-macros [macros.core :as mac]))
 
 (mac/vars container
-         scene
-         camera
-         renderer
-         controls
-         stats
-         light
-         (clock (THREE.Clock.))
-         (keyboard (THREEx.KeyboardState.))
-         MovingCube
-         EnemyCube1
-         EnemyCube2
-         (collidableMeshList (array))
-         (arrowList (array))
-         (directionList (array)))
-
+          scene
+          camera
+          renderer
+          controls
+          stats
+          light
+          (clock (THREE.Clock.))
+          (keyboard (THREEx.KeyboardState.))
+          MovingCube
+          EnemyCube1
+          EnemyCube2
+          (collision-mesh-lst (array))
+          (arrowList (array))
+          (directionList (array)))
 
 (mac/vars (scene (THREE.Scene.))
           ;CAMERA
@@ -71,84 +70,40 @@
           (wall (THREE.Mesh. wallGeometry wallMaterial)))
 (-> wall .-position (set! (THREE.Vector3. 100 50 -100)))
 (.add scene wall)
-(.push collidableMeshList wall)
+;(.push collision-mesh-lst wall)
 
 (def wall2 (THREE.Mesh. wallGeometry wallMaterial))
 (-> wall2 .-position (set! (THREE.Vector3. -150 50 0)))
 (set! (-> wall2 .-rotation .-y)  (/ 3.14159 2))
 
+;(.push collision-mesh-lst MovingCube)
+(.push collision-mesh-lst EnemyCube1)
+(.push collision-mesh-lst EnemyCube2)
+
 (.add scene wall2)
-(.push collidableMeshList wall2)
+;(.push collision-mesh-lst wall2)
 
 (.add MovingCube camera)
 
-(def bullet-lst (array))
 
-(defn create-bullet [obj]
-  (let [geometry (THREE.SphereGeometry. 10 10 10)
-        material (THREE.MeshNormalMaterial.)
-        bullet (THREE.Mesh. geometry material)
-        pos-vec (THREE.Vector3. (-> obj .-position .-x)
-                                (-> obj .-position .-y)
-                                (-> obj .-position .-z))
-        rot-vec (THREE.Vector3. (-> obj .-rotation .-x)
-                                (-> obj .-rotation .-y)
-                                (-> obj .-rotation .-z))]
-    (set! (-> bullet .-position) pos-vec)
-    (set! (-> bullet .-rotation .-y) (-> obj .-rotation .-y))
-    (.add scene bullet)
-    (.push bullet-lst {:three-obj bullet :mv-dist (atom 0)})))
 
-(defn update-bullet [bullet-lst]
-  (doseq [bullet bullet-lst]
-    (let [three-obj (:three-obj bullet)
-          mv-dist (:mv-dist bullet)]
-      (if (>= @mv-dist 350)
-        (do
-          (.remove scene three-obj)
-          (remove #(= bullet %) bullet-lst))
-        (do
-          (.translateZ three-obj -5)
-          ;(mac/+= (-> three-obj .-position .-z) 5)
-          (reset! mv-dist (+ @mv-dist 5)))))))
-  
-(defn collision [moving meshlist]
-  (let [originPoint (-> moving .-position .clone)
-        colli-list (array)]
-  	(doseq [index (range (-> moving .-geometry .-vertices .-length))]
-      (mac/vars (localVertex (.clone (aget (-> moving .-geometry .-vertices) index)))
-	  	         (globalVertex (.applyMatrix4 localVertex (-> moving .-matrix)))
-	  	         (directionVector (.sub globalVertex (-> moving .-position)))
-               (ray (THREE.Raycaster. originPoint (-> directionVector .clone .normalize)))
-               (colli (.intersectObjects ray meshlist)))
-      (.push colli-list colli))
-    colli-list))
-
-(defn collision? [result-lst]
-  (some #(> (-> % .-length) 0) result-lst))
+(comment (defn collision [moving meshlist]
+           (let [originPoint (-> moving .-position .clone)
+                 colli-lst (array)]
+             (doseq [index (range (-> moving .-geometry .-vertices .-length))]
+               (mac/vars (localVertex (.clone (aget (-> moving .-geometry .-vertices) index)))
+                         (globalVertex (.applyMatrix4 localVertex (-> moving .-matrix)))
+                         (directionVector (.sub globalVertex (-> moving .-position)))
+                         (ray (THREE.Raycaster. originPoint (-> directionVector .clone .normalize)))
+                         (colli (.intersectObjects ray meshlist)))
+               (.push colli-lst colli))
+             colli-lst)))
 
 (defn key-pressed [key]
   (.pressed keyboard key))
 
 (defn log [o]
   (.log js/console o))
-
-(comment (mac/defaction up-down-left [mv-distance]
-  {:name "up" :behavior (fn []
-                          (mac/-= (-> EnemyCube .-position .-z) mv-distance)
-                          (reset! test-count (+ @test-count 1))
-                          (reset! up-count (+ @up-count 1)))
-   :end-cnd #(>= @test-count 20)
-   :next-bh "down"}
-  {:name "down" :behavior (fn []
-                            (mac/+= (-> EnemyCube .-position .-z) mv-distance)
-                            (reset! test-count (- @test-count 1)))
-   :end-cnd #(<= @test-count 0) :next-bh "left"}
-  {:name "left" :behavior (fn []
-                            (mac/-= (-> EnemyCube .-position .-x) mv-distance)
-                            (reset! test-count (- @test-count 1)))
-   :multi-cnd [{:end-cnd #(>= @up-count 100) :next-bh "down"}
-                {:end-cnd #(<= @test-count -20) :next-bh "up"}]}))
 
 (mac/defenemy test-enemy [three-obj] "up"
   [test-count (atom 1)
@@ -184,15 +139,82 @@
 (defn update-test-enemy [obj mv-distance]
   ((:set-mv-distance obj) mv-distance)
   (action obj))
+(defn set-colli-obj [colli-objs colli-lst]
+  (doseq [obj colli-objs]
+    (let [mesh (-> obj .-object)]
+      (if (not (some #(= % mesh) colli-lst))
+        (.push colli-lst mesh))))
+  colli-lst)
+
+(def bullet-lst (array))
+
+(defn create-bullet [obj]
+  (let [geometry (THREE.SphereGeometry. 10 10 10)
+        material (THREE.MeshNormalMaterial.)
+        bullet (THREE.Mesh. geometry material)
+        pos-vec (THREE.Vector3. (-> obj .-position .-x)
+                                (-> obj .-position .-y)
+                                (-> obj .-position .-z))
+        rot-vec (THREE.Vector3. (-> obj .-rotation .-x)
+                                (-> obj .-rotation .-y)
+                                (-> obj .-rotation .-z))]
+    (set! (-> bullet .-position) pos-vec)
+    (set! (-> bullet .-rotation .-y) (-> obj .-rotation .-y))
+    (.add scene bullet)
+    (.push bullet-lst {:three-obj bullet :mv-dist (atom 0)})))
+
+;bullet remove from lst and scene
+(defn bullet-remove [lst bullet]
+  (.remove scene (:three-obj bullet))
+  (remove #(= bullet %) lst))
+
+(defn update-bullet [bullet-lst]
+  (doseq [bullet bullet-lst]
+    (let [three-obj (:three-obj bullet)
+          mv-dist (:mv-dist bullet)]
+      (if (>= @mv-dist 350)
+        (bullet-remove bullet-lst bullet)
+        (do
+          (.translateZ three-obj -5)
+          (reset! mv-dist (+ @mv-dist 5)))))))
+
+(defn collision [moving meshlist]
+  (let [originPoint (-> moving .-position .clone)
+        colli-lst (array)]
+    (doseq [index (range (-> moving .-geometry .-vertices .-length))]
+      (mac/vars (localVertex (.clone (aget (-> moving .-geometry .-vertices) index)))
+                (globalVertex (.applyMatrix4 localVertex (-> moving .-matrix)))
+                (directionVector (.sub globalVertex (-> moving .-position)))
+                (ray (THREE.Raycaster. originPoint (-> directionVector .clone .normalize)))
+                (colli (.intersectObjects ray meshlist)))
+      (when (and (> (-> colli .-length) 0)
+                 (< (-> (aget colli 0) .-distance) (.length directionVector)))
+        (set-colli-obj colli colli-lst)))
+    colli-lst))
+
+(defn delete-shooting [bullet-lst collision-mesh-lst]
+  (doseq [bullet bullet-lst]
+    (let [bullet-obj (:three-obj bullet)
+          colli-meshes (collision bullet-obj collision-mesh-lst)]
+      (log colli-meshes))))
+
+ (comment     (when (excist? colli-meshes)
+        (doseq [mesh colli-meshes]
+          (.remove scene mesh)
+          (remove #(= mesh %) collision-mesh-lst))
+        (bullet-remove bullet-lst bullet)))
 
 (def shoted-time (atom 0))
 
+(defn excist? [v]
+  (not (empty? v)))
+
 (defn update []
-  (let [colli-lst (collision MovingCube collidableMeshList)
+  (let [colli-lst (collision MovingCube collision-mesh-lst)
         delta (-> clock .getDelta)
         elap (-> clock .getElapsedTime)
-	      moveDistance (* 100  delta)
-	      rotateAngle  (* (/ Math.PI 2) delta)
+        moveDistance (* 100  delta)
+        rotateAngle  (* (/ Math.PI 2) delta)
         shot-time-lag 0.5]
     (when (key-pressed "A")
       (mac/+= (-> MovingCube .-rotation .-y) rotateAngle))
@@ -210,9 +232,9 @@
       (when (>= elap (+ @shoted-time shot-time-lag))
         (create-bullet MovingCube)
         (reset! shoted-time elap)))
-    (when (collision? colli-lst)
-      (log "collision"))
-    (update-bullet bullet-lst)
+    (when (excist? bullet-lst)
+      (delete-shooting bullet-lst collision-mesh-lst)
+      (update-bullet bullet-lst))
     ;(update-test-enemy test-obj1 moveDistance)
     ;(update-test-enemy test-obj2 (+ moveDistance 50))
     ;(up-down-left moveDistance)
