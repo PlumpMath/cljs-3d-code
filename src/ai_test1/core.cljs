@@ -85,20 +85,6 @@
 
 (.add MovingCube camera)
 
-
-
-(comment (defn collision [moving meshlist]
-           (let [originPoint (-> moving .-position .clone)
-                 colli-lst (array)]
-             (doseq [index (range (-> moving .-geometry .-vertices .-length))]
-               (mac/vars (localVertex (.clone (aget (-> moving .-geometry .-vertices) index)))
-                         (globalVertex (.applyMatrix4 localVertex (-> moving .-matrix)))
-                         (directionVector (.sub globalVertex (-> moving .-position)))
-                         (ray (THREE.Raycaster. originPoint (-> directionVector .clone .normalize)))
-                         (colli (.intersectObjects ray meshlist)))
-               (.push colli-lst colli))
-             colli-lst)))
-
 (defn key-pressed [key]
   (.pressed keyboard key))
 
@@ -128,8 +114,6 @@
          :multi-cnd [{:end-cnd #(>= @up-count 100) :next-state :down}
                      {:end-cnd #(<= @test-count -20) :next-state :up}]}])
 
-(comment (>= @test-count 20))
-
 (def test-obj1 (test-enemy EnemyCube1))
 (def test-obj2 (test-enemy EnemyCube2))
 
@@ -139,6 +123,7 @@
 (defn update-test-enemy [obj mv-distance]
   ((:set-mv-distance obj) mv-distance)
   (action obj))
+
 (defn set-colli-obj [colli-objs colli-lst]
   (doseq [obj colli-objs]
     (let [mesh (-> obj .-object)]
