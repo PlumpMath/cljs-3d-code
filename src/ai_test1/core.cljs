@@ -82,6 +82,36 @@
 
 (.add MovingCube camera)
 
+(def bullet-lst (array))
+
+(defn create-bullet [obj]
+  (let [geometry (THREE.SphereGeometry. 10 10 10)
+        material (THREE.MeshNormalMaterial.)
+        bullet (THREE.Mesh. geometry material)
+        pos-vec (THREE.Vector3. (-> obj .-position .-x)
+                                (-> obj .-position .-y)
+                                (-> obj .-position .-z))
+        rot-vec (THREE.Vector3. (-> obj .-rotation .-x)
+                                (-> obj .-rotation .-y)
+                                (-> obj .-rotation .-z))]
+    (set! (-> bullet .-position) pos-vec)
+    (set! (-> bullet .-rotation .-y) (-> obj .-rotation .-y))
+    (.add scene bullet)
+    (.push bullet-lst {:three-obj bullet :mv-dist (atom 0)})))
+
+(defn update-bullet [bullet-lst]
+  (doseq [bullet bullet-lst]
+    (let [three-obj (:three-obj bullet)
+          mv-dist (:mv-dist bullet)]
+      (if (>= @mv-dist 350)
+        (do
+          (.remove scene three-obj)
+          (remove #(= bullet %) bullet-lst))
+        (do
+          (.translateZ three-obj -5)
+          ;(mac/+= (-> three-obj .-position .-z) 5)
+          (reset! mv-dist (+ @mv-dist 5)))))))
+  
 (defn collision [moving meshlist]
   (let [originPoint (-> moving .-position .clone)
         colli-list (array)]
@@ -155,27 +185,36 @@
   ((:set-mv-distance obj) mv-distance)
   (action obj))
 
+(def shoted-time (atom 0))
+
 (defn update []
   (let [colli-lst (collision MovingCube collidableMeshList)
         delta (-> clock .getDelta)
+        elap (-> clock .getElapsedTime)
 	      moveDistance (* 100  delta)
-	      rotateAngle  (* (/ Math.PI 2) delta)]
+	      rotateAngle  (* (/ Math.PI 2) delta)
+        shot-time-lag 0.5]
     (when (key-pressed "A")
       (mac/+= (-> MovingCube .-rotation .-y) rotateAngle))
     (when (key-pressed "D")
       (mac/-= (-> MovingCube .-rotation .-y) rotateAngle))
     (when (key-pressed "left")
-      (mac/-= (-> MovingCube .-position .-x) moveDistance))
+      (.translateX MovingCube (* -1 moveDistance)))
     (when (key-pressed "right")
-      (mac/+= (-> MovingCube .-position .-x) moveDistance))
+      (.translateX MovingCube moveDistance))
     (when (key-pressed "up")
-      (mac/-= (-> MovingCube .-position .-z) moveDistance))
+      (.translateZ MovingCube (* -1 moveDistance)))
     (when (key-pressed "down")
-      (mac/+= (-> MovingCube .-position .-z) moveDistance))
+      (.translateZ MovingCube moveDistance))
+    (when (key-pressed "S")
+      (when (>= elap (+ @shoted-time shot-time-lag))
+        (create-bullet MovingCube)
+        (reset! shoted-time elap)))
     (when (collision? colli-lst)
       (log "collision"))
-    (update-test-enemy test-obj1 moveDistance)
-    (update-test-enemy test-obj2 (+ moveDistance 50))
+    (update-bullet bullet-lst)
+    ;(update-test-enemy test-obj1 moveDistance)
+    ;(update-test-enemy test-obj2 (+ moveDistance 50))
     ;(up-down-left moveDistance)
     ))
 
@@ -188,4 +227,3 @@
   (update))
 
 (animate)
-(log EnemyCube2)
