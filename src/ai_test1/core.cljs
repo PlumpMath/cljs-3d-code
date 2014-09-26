@@ -124,12 +124,10 @@
   ((:set-mv-distance obj) mv-distance)
   (action obj))
 
-(defn set-colli-obj [colli-objs colli-lst]
-  (doseq [obj colli-objs]
-    (let [mesh (-> obj .-object)]
-      (if (not (some #(= % mesh) colli-lst))
-        (.push colli-lst mesh))))
-  colli-lst)
+(defn my-remove [arr item]
+  (doseq [i (range (-> arr .-length))]
+    (when (= item (aget arr i))
+      (.splice arr i 1))))
 
 (def bullet-lst (array))
 
@@ -151,7 +149,7 @@
 ;bullet remove from lst and scene
 (defn bullet-remove [lst bullet]
   (.remove scene (:three-obj bullet))
-  (remove #(= bullet %) lst))
+  (my-remove lst bullet))
 
 (defn update-bullet [bullet-lst]
   (doseq [bullet bullet-lst]
@@ -162,6 +160,13 @@
         (do
           (.translateZ three-obj -5)
           (reset! mv-dist (+ @mv-dist 5)))))))
+
+(defn set-colli-obj [colli-objs colli-lst]
+  (doseq [obj colli-objs]
+    (let [mesh (-> obj .-object)]
+      (if (not (some #(= % mesh) colli-lst))
+        (.push colli-lst mesh))))
+  colli-lst)
 
 (defn collision [moving meshlist]
   (let [originPoint (-> moving .-position .clone)
@@ -181,13 +186,11 @@
   (doseq [bullet bullet-lst]
     (let [bullet-obj (:three-obj bullet)
           colli-meshes (collision bullet-obj collision-mesh-lst)]
-      (log colli-meshes))))
-
- (comment     (when (excist? colli-meshes)
+      (when (excist? colli-meshes)
         (doseq [mesh colli-meshes]
           (.remove scene mesh)
-          (remove #(= mesh %) collision-mesh-lst))
-        (bullet-remove bullet-lst bullet)))
+          (my-remove collision-mesh-lst mesh))
+        (bullet-remove bullet-lst bullet)))))
 
 (def shoted-time (atom 0))
 
