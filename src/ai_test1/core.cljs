@@ -1,4 +1,5 @@
 (ns ai-test1.core
+  (:require [util.core :as util])
   (:require-macros [macros.core :as mac]))
 
 (mac/vars container
@@ -13,7 +14,6 @@
           MovingCube
           EnemyCube1
           EnemyCube2
-          (collision-mesh-lst (array))
           (arrowList (array))
           (directionList (array)))
 
@@ -25,6 +25,9 @@
           (ASPECT (/ SCREEN_WIDTH SCREEN_HEIGHT))
           (NEAR 0.1)
           (FAR 20000))
+
+(def collision-mesh-lst (array))
+
 (set! camera
       (doto (THREE.PerspectiveCamera. VIEW_ANGLE ASPECT NEAR FAR) ;create camera
         (.position.set 0 150 400)
@@ -55,12 +58,20 @@
 (mac/vars (cubeGeometry (THREE.CubeGeometry. 50 50 50 1 1 1))
           (wireMaterial (THREE.MeshBasicMaterial. (js* "{ color: 0xff0000, wireframe:true }"))))
 (set! MovingCube (THREE.Mesh. cubeGeometry wireMaterial))
-(-> MovingCube .-position (set! (THREE.Vector3. 0 25.1 0)))
+(-> MovingCube .-position (set! (THREE.Vector3. 50 25.1 100)))
 (.add scene MovingCube)
 ;enemy cube
 (set! EnemyCube1 (THREE.Mesh. cubeGeometry wireMaterial))
 (-> EnemyCube1 .-position (set! (THREE.Vector3. 50 25.1 0)))
 (.add scene EnemyCube1)
+
+(def canon-geometry (THREE.SphereGeometry. 10 10 10))
+(def canon-material (THREE.MeshNormalMaterial.))
+(def canon1 (THREE.Mesh. canon-geometry canon-material))
+(set! (-> canon1 .-position .-z) (+ (-> EnemyCube1 .-position .-z) 25))
+(.add scene canon1)
+(.add EnemyCube1 canon1)
+
 (set! EnemyCube2 (THREE.Mesh. cubeGeometry wireMaterial))
 (-> EnemyCube2 .-position (set! (THREE.Vector3. 300 25.1 30)))
 (.add scene EnemyCube2)
@@ -90,6 +101,21 @@
 
 (defn log [o]
   (.log js/console o))
+
+;(log (util/baz canon1 MovingCube))
+;(def rot-val (util/baz EnemyCube1 MovingCube))
+;(def rot-val (util/baz canon1 MovingCube))
+;(log (-> canon1 .-position))
+;(log rot-val)
+;(.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) (* -1 rot-val))
+(comment
+  (let [moving-x (-> MovingCube .-position .-x)
+      enemy-x (-> EnemyCube1 .-position .-x)]
+  (if (> moving-x enemy-x)
+    (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) rot-val)
+    (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) (* -1 rot-val)))))
+;(set! (-> EnemyCube1 .-rotation .-y) rot-val)
+;(mac/+= (-> EnemyCube1 .-rotation .-y) (* -1 rot-val))
 
 (mac/defenemy test-enemy [three-obj] "up"
   [test-count (atom 1)
@@ -124,11 +150,6 @@
   ((:set-mv-distance obj) mv-distance)
   (action obj))
 
-(defn my-remove [arr item]
-  (doseq [i (range (-> arr .-length))]
-    (when (= item (aget arr i))
-      (.splice arr i 1))))
-
 (def bullet-lst (array))
 
 (defn create-bullet [obj]
@@ -144,12 +165,12 @@
     (set! (-> bullet .-position) pos-vec)
     (set! (-> bullet .-rotation .-y) (-> obj .-rotation .-y))
     (.add scene bullet)
-    (.push bullet-lst {:three-obj bullet :mv-dist (atom 0)})))
+    (.push bullet-lst {:three-obj bullet :mv-dist (atom 0) :damage 5})))
 
 ;bullet remove from lst and scene
 (defn bullet-remove [lst bullet]
   (.remove scene (:three-obj bullet))
-  (my-remove lst bullet))
+  (util/my-remove lst bullet))
 
 (defn update-bullet [bullet-lst]
   (doseq [bullet bullet-lst]
@@ -186,16 +207,13 @@
   (doseq [bullet bullet-lst]
     (let [bullet-obj (:three-obj bullet)
           colli-meshes (collision bullet-obj collision-mesh-lst)]
-      (when (excist? colli-meshes)
+      (when (util/excist? colli-meshes)
         (doseq [mesh colli-meshes]
           (.remove scene mesh)
-          (my-remove collision-mesh-lst mesh))
+          (util/my-remove collision-mesh-lst mesh))
         (bullet-remove bullet-lst bullet)))))
 
 (def shoted-time (atom 0))
-
-(defn excist? [v]
-  (not (empty? v)))
 
 (defn update []
   (let [colli-lst (collision MovingCube collision-mesh-lst)
@@ -203,7 +221,8 @@
         elap (-> clock .getElapsedTime)
         moveDistance (* 100  delta)
         rotateAngle  (* (/ Math.PI 2) delta)
-        shot-time-lag 0.5]
+        shot-time-lag 0.5
+        rot-val (util/baz EnemyCube1 MovingCube)]
     (when (key-pressed "A")
       (mac/+= (-> MovingCube .-rotation .-y) rotateAngle))
     (when (key-pressed "D")
@@ -220,9 +239,19 @@
       (when (>= elap (+ @shoted-time shot-time-lag))
         (create-bullet MovingCube)
         (reset! shoted-time elap)))
-    (when (excist? bullet-lst)
+    (when (util/excist? bullet-lst)
       (delete-shooting bullet-lst collision-mesh-lst)
       (update-bullet bullet-lst))
+    (let [moving-x (-> MovingCube .-position .-x)
+          enemy-x (-> EnemyCube1 .-position .-x)
+          enemy-rot-y (-> EnemyCube1 .-rotation .-y)
+          purpose-rot  (if (> moving-x enemy-x) rot-val (* -1 rot-val))]
+      (if (> moving-x enemy-x)
+        (when-not (>= enemy-rot-y purpose-rot)
+          (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) rotateAngle))
+        (when-not (<= enemy-rot-y purpose-rot)
+          (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) (* -1 rotateAngle)))))
+    ;enemy cube1 look at moving cube
     ;(update-test-enemy test-obj1 moveDistance)
     ;(update-test-enemy test-obj2 (+ moveDistance 50))
     ;(up-down-left moveDistance)
