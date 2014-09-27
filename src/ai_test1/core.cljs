@@ -102,54 +102,6 @@
 (defn log [o]
   (.log js/console o))
 
-;(log (util/baz canon1 MovingCube))
-;(def rot-val (util/baz EnemyCube1 MovingCube))
-;(def rot-val (util/baz canon1 MovingCube))
-;(log (-> canon1 .-position))
-;(log rot-val)
-;(.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) (* -1 rot-val))
-(comment
-  (let [moving-x (-> MovingCube .-position .-x)
-      enemy-x (-> EnemyCube1 .-position .-x)]
-  (if (> moving-x enemy-x)
-    (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) rot-val)
-    (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) (* -1 rot-val)))))
-;(set! (-> EnemyCube1 .-rotation .-y) rot-val)
-;(mac/+= (-> EnemyCube1 .-rotation .-y) (* -1 rot-val))
-
-(mac/defenemy test-enemy [three-obj] "up"
-  [test-count (atom 1)
-   up-count (atom 1)
-   count-up (fn [] (reset! test-count (+ @test-count 1)))
-   count-down (fn [] (reset! test-count (- @test-count 1)))
-   up-count-up (fn [] (reset! up-count (+ @up-count 1)))
-   mv-distance (atom nil)
-   set-mv-distance (fn [value] (reset! mv-distance value))
-   up {:behavior (fn []
-                   (mac/-= (-> three-obj .-position .-z) @mv-distance)
-                   (count-up)
-                   (up-count-up))
-       :end-cnd (fn [] (key-pressed "Z")) :next-state :down}
-   down {:behavior (fn []
-                     (mac/+= (-> three-obj .-position .-z) @mv-distance)
-                     (count-down))
-         :end-cnd #(<= @test-count 0) :next-state :left}
-   left {:behavior (fn []
-                     (mac/-= (-> three-obj .-position .-x) @mv-distance)
-                     (count-down))
-         :multi-cnd [{:end-cnd #(>= @up-count 100) :next-state :down}
-                     {:end-cnd #(<= @test-count -20) :next-state :up}]}])
-
-(def test-obj1 (test-enemy EnemyCube1))
-(def test-obj2 (test-enemy EnemyCube2))
-
-(defn action [obj]
-  ((:action obj) obj))
-
-(defn update-test-enemy [obj mv-distance]
-  ((:set-mv-distance obj) mv-distance)
-  (action obj))
-
 (def bullet-lst (array))
 
 (defn create-bullet [obj]
@@ -224,17 +176,23 @@
         shot-time-lag 0.5
         rot-val (util/baz EnemyCube1 MovingCube)]
     (when (key-pressed "A")
-      (mac/+= (-> MovingCube .-rotation .-y) rotateAngle))
+      (.rotateOnAxis MovingCube (THREE.Vector3. 0 1 0) rotateAngle)
+      ;(mac/+= (-> MovingCube .-rotation .-y) rotateAngle)
+      (log (-> MovingCube .-rotation .-y)))
     (when (key-pressed "D")
       (mac/-= (-> MovingCube .-rotation .-y) rotateAngle))
     (when (key-pressed "left")
-      (.translateX MovingCube (* -1 moveDistance)))
+      (.translateX MovingCube (* -1 moveDistance))
+      (log rot-val))
     (when (key-pressed "right")
-      (.translateX MovingCube moveDistance))
+      (.translateX MovingCube moveDistance)
+      (log rot-val))
     (when (key-pressed "up")
-      (.translateZ MovingCube (* -1 moveDistance)))
+      (.translateZ MovingCube (* -1 moveDistance))
+      (log rot-val))
     (when (key-pressed "down")
-      (.translateZ MovingCube moveDistance))
+      (.translateZ MovingCube moveDistance)
+      (log rot-val))
     (when (key-pressed "S")
       (when (>= elap (+ @shoted-time shot-time-lag))
         (create-bullet MovingCube)
@@ -243,19 +201,43 @@
       (delete-shooting bullet-lst collision-mesh-lst)
       (update-bullet bullet-lst))
     (let [moving-x (-> MovingCube .-position .-x)
+          moving-z (-> MovingCube .-position .-z)
           enemy-x (-> EnemyCube1 .-position .-x)
+          enemy-z (-> EnemyCube1 .-position .-z)
           enemy-rot-y (-> EnemyCube1 .-rotation .-y)
-          purpose-rot  (if (> moving-x enemy-x) rot-val (* -1 rot-val))]
+          purpose-rot  (if (> moving-z enemy-z)
+                         (if (> moving-x enemy-x) rot-val (* -1 rot-val))
+                         (if (> moving-x enemy-x) (- 1.5 rot-val) (* -1 (- 1.5 rot-val))))
+                         ]
+      (log purpose-rot)
+          ;purpose-rot  rot-val]
       (if (> moving-x enemy-x)
-        (when-not (>= enemy-rot-y purpose-rot)
-          (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) rotateAngle))
-        (when-not (<= enemy-rot-y purpose-rot)
-          (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) (* -1 rotateAngle)))))
-    ;enemy cube1 look at moving cube
-    ;(update-test-enemy test-obj1 moveDistance)
-    ;(update-test-enemy test-obj2 (+ moveDistance 50))
-    ;(up-down-left moveDistance)
-    ))
+        (cond (< enemy-rot-y purpose-rot) 
+              (if (> moving-z enemy-z)
+                (do (log "normal")
+                  (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) rotateAngle)))
+              (> enemy-rot-y purpose-rot) 
+              (cond
+               (> moving-z enemy-z)
+               (do (log "back") (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) (* -1 rotateAngle)))
+               (< moving-z enemy-z)
+               (do (log "con")
+                 (if (> enemy-rot-y purpose-rot)(.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) rotateAngle))
+               :default nil)))
+        
+        (cond (< enemy-rot-y purpose-rot)
+              (if (> moving-z enemy-z)
+                (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) rotateAngle)
+                (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) (* -1 rotateAngle)))
+              (> enemy-rot-y purpose-rot)
+              (if (> moving-z enemy-z)
+                (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) (* -1 rotateAngle))
+                (if (< enemy-rot-y purpose-rot)
+                  (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0)  rotateAngle))))))
+        ))
+    
+
+
 
 (defn render []
   (.render renderer scene camera))
