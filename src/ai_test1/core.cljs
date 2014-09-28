@@ -1,5 +1,6 @@
 (ns ai-test1.core
-  (:require [util.core :as util])
+  (:require [util.core :as util]
+            [look.core :as lk])
   (:require-macros [macros.core :as mac]))
 
 (mac/vars container
@@ -75,6 +76,12 @@
 (set! EnemyCube2 (THREE.Mesh. cubeGeometry wireMaterial))
 (-> EnemyCube2 .-position (set! (THREE.Vector3. 300 25.1 30)))
 (.add scene EnemyCube2)
+
+(def canon2 (THREE.Mesh. canon-geometry canon-material))
+(set! (-> canon2 .-position .-z) (+ (-> EnemyCube2 .-position .-z) 25))
+(.add scene canon2)
+(.add EnemyCube2 canon2)
+
 (mac/vars (wallGeometry (THREE.CubeGeometry. 100 100 20 1 1 1))
           (wallMaterial (THREE.MeshLambertMaterial. (js* "{ color: 0xffffff}")))
           (wireMaterial (THREE.MeshLambertMaterial. (js* "{ color: 0xffffff}")))
@@ -173,26 +180,19 @@
         elap (-> clock .getElapsedTime)
         moveDistance (* 100  delta)
         rotateAngle  (* (/ Math.PI 2) delta)
-        shot-time-lag 0.5
-        rot-val (util/baz EnemyCube1 MovingCube)]
+        shot-time-lag 0.5]
     (when (key-pressed "A")
-      (.rotateOnAxis MovingCube (THREE.Vector3. 0 1 0) rotateAngle)
-      ;(mac/+= (-> MovingCube .-rotation .-y) rotateAngle)
-      (log (-> MovingCube .-rotation .-y)))
+      (.rotateOnAxis MovingCube (THREE.Vector3. 0 1 0) rotateAngle))
     (when (key-pressed "D")
       (mac/-= (-> MovingCube .-rotation .-y) rotateAngle))
     (when (key-pressed "left")
-      (.translateX MovingCube (* -1 moveDistance))
-      (log rot-val))
+      (.translateX MovingCube (* -1 moveDistance)))
     (when (key-pressed "right")
-      (.translateX MovingCube moveDistance)
-      (log rot-val))
+      (.translateX MovingCube moveDistance))
     (when (key-pressed "up")
-      (.translateZ MovingCube (* -1 moveDistance))
-      (log rot-val))
+      (.translateZ MovingCube (* -1 moveDistance)))
     (when (key-pressed "down")
-      (.translateZ MovingCube moveDistance)
-      (log rot-val))
+      (.translateZ MovingCube moveDistance))
     (when (key-pressed "S")
       (when (>= elap (+ @shoted-time shot-time-lag))
         (create-bullet MovingCube)
@@ -200,44 +200,9 @@
     (when (util/excist? bullet-lst)
       (delete-shooting bullet-lst collision-mesh-lst)
       (update-bullet bullet-lst))
-    (let [moving-x (-> MovingCube .-position .-x)
-          moving-z (-> MovingCube .-position .-z)
-          enemy-x (-> EnemyCube1 .-position .-x)
-          enemy-z (-> EnemyCube1 .-position .-z)
-          enemy-rot-y (-> EnemyCube1 .-rotation .-y)
-          purpose-rot  (if (> moving-z enemy-z)
-                         (if (> moving-x enemy-x) rot-val (* -1 rot-val))
-                         (if (> moving-x enemy-x) (- 1.5 rot-val) (* -1 (- 1.5 rot-val))))
-                         ]
-      (log purpose-rot)
-          ;purpose-rot  rot-val]
-      (if (> moving-x enemy-x)
-        (cond (< enemy-rot-y purpose-rot) 
-              (if (> moving-z enemy-z)
-                (do (log "normal")
-                  (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) rotateAngle)))
-              (> enemy-rot-y purpose-rot) 
-              (cond
-               (> moving-z enemy-z)
-               (do (log "back") (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) (* -1 rotateAngle)))
-               (< moving-z enemy-z)
-               (do (log "con")
-                 (if (> enemy-rot-y purpose-rot)(.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) rotateAngle))
-               :default nil)))
-        
-        (cond (< enemy-rot-y purpose-rot)
-              (if (> moving-z enemy-z)
-                (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) rotateAngle)
-                (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) (* -1 rotateAngle)))
-              (> enemy-rot-y purpose-rot)
-              (if (> moving-z enemy-z)
-                (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0) (* -1 rotateAngle))
-                (if (< enemy-rot-y purpose-rot)
-                  (.rotateOnAxis EnemyCube1 (THREE.Vector3. 0 1 0)  rotateAngle))))))
-        ))
-    
-
-
+    (lk/look-at-target EnemyCube1 MovingCube rotateAngle) 
+    (lk/look-at-target EnemyCube2 MovingCube rotateAngle) 
+    ))
 
 (defn render []
   (.render renderer scene camera))
