@@ -75,7 +75,7 @@
   '(fn [this]
      (let [bhv (:behavior @state)
            end-cnd (:end-cnd @state)
-           next-state (if (:next-state @state) 
+           next-state (if (:next-state @state)
                         ((:next-state @state) this))
            multi-cnd (:multi-cnd @state)]
        (bhv)
@@ -114,18 +114,18 @@
   [print-my-str (fn [] (println my-string))
    count (atom 0)
    count-all (atom 0)
-   count-up (fn [] 
+   count-up (fn []
               (reset! count (+ @count 1))
               (reset! count-all (+ @count-all 1)))
-   count-down (fn [] 
+   count-down (fn []
                 (reset! count (- @count 1))
                 (reset! count-all (+ @count-all 1)))
-   up   {:behavior (fn [] 
+   up   {:behavior (fn []
                      (count-up)
                      (println "up")
                      (print-my-str))
          :end-cnd #(>= @count 10) :next-state :down}
-   down {:behavior (fn [] 
+   down {:behavior (fn []
                      (count-down)
                      (println "down")
                      (print-my-str))
@@ -133,3 +133,43 @@
                       {:end-cnd #(>= @count-all 30) :next-state :strange}]}
    strange {:behavior (fn [] (println "strange"))
             :end-cnd (fn [] nil)}]))
+
+ (defmacro my-case [e & clauses]
+   `(my-cond 
+     ~@(map (fn [c] `[(= ~e ~(first c)) ~(second c)])
+            clauses)))
+ 
+ 
+ (defmacro dlambda [& ds]
+  (let [args (gensym)]
+     `(fn [& ~args]
+       (my-case (first ~args)
+         ~@(map (fn [d]
+                  `[ ~(if (= nil (first d))
+                        nil
+                        (first d))
+                     (apply (fn ~@(rest d))
+                            ~(if (= nil `(first d))
+                               args
+                               `(rest ~args)))])
+                ds)))))
+ 
+ (defmacro make-obj [name & ds]
+   `(def ~(symbol name) 
+      (dlambda ~@ds)))
+
+ (comment 
+   (defmacro my-cond
+     [& clauses]
+     (when clauses
+       (list 'if (first (first clauses))
+             (if (first clauses)
+               (second (first clauses))
+               (throw (IllegalArgumentException.
+                       "cond requires an even number of forms")))
+             (cons 'my-cond (next clauses)))))
+
+   (def baz (dlambda (:print [] (println "hello"))
+                     (:add [v] (+ v v))
+                     (nil [] 10)))
+   )
