@@ -29,11 +29,7 @@
 
 (def collision-mesh-lst (array))
 
-(set! camera
-      (doto (THREE.PerspectiveCamera. VIEW_ANGLE ASPECT NEAR FAR) ;create camera
-        (.position.set 0 150 400)
-        (.lookAt (.-position scene))))
-(.add scene camera)
+
 ;RENDERER
 (set! renderer (THREE.WebGLRenderer. (js* "{antialias:true}")))
 (.setSize renderer SCREEN_WIDTH SCREEN_HEIGHT)
@@ -49,7 +45,7 @@
           (floor (THREE.Mesh. floorGeometry floorMaterial)))
 (-> floor .-position .-y (set! -0.5))
 (-> floor .-rotation .-x (set! (/ Math.PI 2)))
-(.add scene floor)
+;(.add scene floor)
 ;SKYBOX/FOG
 (mac/vars (skyBoxGeometry (THREE.CubeGeometry. 10000 10000 10000))
           (skyBoxMaterial (THREE.MeshBasicMaterial. (js* "{color: 0x9999ff, side: THREE.BackSide}")))
@@ -59,28 +55,35 @@
 (mac/vars (cubeGeometry (THREE.CubeGeometry. 50 50 50 1 1 1))
           (wireMaterial (THREE.MeshBasicMaterial. (js* "{ color: 0xff0000, wireframe:true }"))))
 (set! MovingCube (THREE.Mesh. cubeGeometry wireMaterial))
-(-> MovingCube .-position (set! (THREE.Vector3. 50 25.1 100)))
+(-> MovingCube .-position (set! (THREE.Vector3. 50 35.1 100)))
+(-> MovingCube .-scale (set! (THREE.Vector3. 0.1 0.1 0.1)))
 (.add scene MovingCube)
+;camera
+(set! camera
+      (doto (THREE.PerspectiveCamera. VIEW_ANGLE ASPECT NEAR FAR) ;create camera
+        (.position.set 50 25.1 120)
+        (.lookAt (.-position scene))))
+(.add scene camera)
 ;enemy cube
 (set! EnemyCube1 (THREE.Mesh. cubeGeometry wireMaterial))
 (-> EnemyCube1 .-position (set! (THREE.Vector3. 50 25.1 0)))
-(.add scene EnemyCube1)
+;(.add scene EnemyCube1)
 
 (def canon-geometry (THREE.SphereGeometry. 10 10 10))
 (def canon-material (THREE.MeshNormalMaterial.))
 (def canon1 (THREE.Mesh. canon-geometry canon-material))
 (set! (-> canon1 .-position .-z) (+ (-> EnemyCube1 .-position .-z) 25))
-(.add scene canon1)
-(.add EnemyCube1 canon1)
+;(.add scene canon1)
+;(.add EnemyCube1 canon1)
 
 (set! EnemyCube2 (THREE.Mesh. cubeGeometry wireMaterial))
 (-> EnemyCube2 .-position (set! (THREE.Vector3. 300 25.1 30)))
-(.add scene EnemyCube2)
+;(.add scene EnemyCube2)
 
 (def canon2 (THREE.Mesh. canon-geometry canon-material))
 (set! (-> canon2 .-position .-z) (+ (-> EnemyCube2 .-position .-z) 25))
-(.add scene canon2)
-(.add EnemyCube2 canon2)
+;(.add scene canon2)
+;(.add EnemyCube2 canon2)
 
 (mac/vars (wallGeometry (THREE.CubeGeometry. 100 100 20 1 1 1))
           (wallMaterial (THREE.MeshLambertMaterial. (js* "{ color: 0xffffff}")))
@@ -98,16 +101,112 @@
 (.push collision-mesh-lst EnemyCube1)
 (.push collision-mesh-lst EnemyCube2)
 
-(.add scene wall2)
+;(.add scene wall2)
 ;(.push collision-mesh-lst wall2)
+
+;(def city (THREEx.ProceduralCity.))
+;(.add scene city)
+
+;animation vars
+(mac/vars (animOffset 1)  ;starting frame of animation
+          (duration 5000) ;milliseconds to complete animation
+          (keyframes 250) ;total number of animation frames
+          (interpolation (/ duration keyframes)) ;milliseconds per frame
+          (lastKeyframe 0) ;previous keyframe
+          (currentKeyframe 0))
+
+(defn ani [model]
+  (let [time (mod (.getTime (js/Date.)) duration)
+        fl-inter (.floor js/Math (/ time  interpolation ))
+        keyframe   (+ fl-inter animOffset)
+        model-influ (-> model .-morphTargetInfluences)]
+    (when (not (= keyframe currentKeyframe))
+      (aset model-influ lastKeyframe 0)
+      (aset model-influ currentKeyframe 1)
+      (aset model-influ keyframe 0)
+      (set! lastKeyframe currentKeyframe)
+      (set! currentKeyframe keyframe))
+    (aset model-influ keyframe (/ (mod time interpolation ) interpolation))
+    (aset model-influ lastKeyframe (- 1 (aget model-influ keyframe)))))
+    ;(when (= currentKeyframe 20)
+    ;  (set! shot nil)
+    ;  (create-ray))))
+
+(defn log [o]
+  (.log js/console o))
+
+;level texture
+(comment
+  (def level-texture (THREE.ImageUtils.loadTexture. "models/Brick_Textured.JPG" ))
+  (set! (-> level-texture .-wrapS) THREE.RepeatWrapping)
+  (set! (-> level-texture .-wrapT) THREE.RepeatWrapping)
+  (.repeat.set	level 10 10)
+  (def level-material
+    (THREE.MeshBasicMaterial. {:map level-texture
+                               :side THREE.DoubleSide }))
+  )
+
+  ;load model
+(def human)
+
+(defn addModelToScene [geometry materials]
+	(let [material (THREE.MeshFaceMaterial. materials)]
+    (set! human (THREE.Mesh. geometry material))
+    (set! (-> human .-scale) (THREE.Vector3. 1 1 1))
+    (.add scene human)))
+
+;load level model
+(def level-model)
+
+(defn addLevelToScene [geometry materials]
+  (let [material (THREE.MeshFaceMaterial. materials)]
+    (set! level-model (THREE.Mesh. geometry material))
+    ;for texture
+    (set! (-> level-model .-material .-needsUpdate) true)
+    (set! (-> level-model .-geometry .-buffersNeedUpdate) true)
+    (set! (-> level-model .-geometry .-uvsNeedUpdate) true)
+
+    (set! (-> level-model .-name) "level")
+
+    (set! (-> level-model .-scale) (THREE.Vector3. 100 100 100))
+    (.push collision-mesh-lst level-model)
+    (.add scene level-model)))
+
+(comment
+  (defn addLevelToScene [geometry materials]
+	(let [level (THREE.Mesh. geometry level-material)]
+    (set! (-> level .-scale) (THREE.Vector3. 100 100 100))
+    (.push collision-mesh-lst level)
+    (.add scene level)
+    (set! level-model level)))
+  )
+
+
+(defn addModelToScene2 [geometry materials]
+  (doseq [i  (range  (-> materials .-length))]
+    (set! (-> (aget materials i) .-morphTargets) true))
+  (let [material (THREE.MeshFaceMaterial. materials)]
+    (set! human (THREE.Mesh. geometry material))
+    (set! (-> human .-scale) (THREE.Vector3. 1 1 1))
+    (.add scene human)))
+
+(def jsonLoader (THREE.JSONLoader.))
+;(.load jsonLoader  "./models/human1.js" add-model)
+;(.load jsonLoader  "./models/human10.js" addModelToScene2)
+;(.load jsonLoader  "./models/man6.js" addModelToScene)
+(.load jsonLoader  "./models/man6.js" addModelToScene2)
+;(.load jsonLoader  "./models/level5.js" addLevelToScene)
+;(.load jsonLoader  "./models/human1.js" addModelToScene)
+;(.load jsonLoader  "./models/human2.js" add-model)
+;(.load jsonLoader  "./models/test9.js" add-model)
+
+(def ambientLight (THREE.AmbientLight. (js* "0x111111")))
+(.add scene ambientLight)
 
 (.add MovingCube camera)
 
 (defn key-pressed [key]
   (.pressed keyboard key))
-
-(defn log [o]
-  (.log js/console o))
 
 (def bullet-lst (array))
 
@@ -162,6 +261,20 @@
         (set-colli-obj colli colli-lst)))
     colli-lst))
 
+(defn collision-for-level [moving meshlist]
+  (let [originPoint (-> moving .-position .clone)
+        colli-lst (array)]
+    (doseq [index (range (-> moving .-geometry .-vertices .-length))]
+      (mac/vars (localVertex (.clone (aget (-> moving .-geometry .-vertices) index)))
+                (globalVertex (.applyMatrix4 localVertex (-> moving .-matrix)))
+                (directionVector (.sub globalVertex (-> moving .-position)))
+                (ray (THREE.Raycaster. originPoint (-> directionVector .clone .normalize)))
+                (colli (.intersectObjects ray meshlist)))
+      (when (and (> (-> colli .-length) 0)
+                 (< (-> (aget colli 0) .-distance) (.length directionVector)))
+        (set-colli-obj colli colli-lst)))
+    colli-lst))
+
 (defn delete-shooting [bullet-lst collision-mesh-lst]
   (doseq [bullet bullet-lst]
     (let [bullet-obj (:three-obj bullet)
@@ -174,6 +287,13 @@
 
 (def shoted-time (atom 0))
 
+(defn collision-wall? [colli-lst]
+  (some #(= % level-model) colli-lst))
+
+(def walking nil)
+(def walkingKeys  ["up" "down" "left" "right"])
+(def sword nil)
+
 (defn update []
   (let [colli-lst (collision MovingCube collision-mesh-lst)
         delta (-> clock .getDelta)
@@ -181,30 +301,47 @@
         moveDistance (* 100  delta)
         rotateAngle  (* (/ Math.PI 2) delta)
         shot-time-lag 0.5]
-    (when (key-pressed "A")
-      (.rotateOnAxis MovingCube (THREE.Vector3. 0 1 0) rotateAngle))
-    (when (key-pressed "D")
-      (mac/-= (-> MovingCube .-rotation .-y) rotateAngle))
-    (when (key-pressed "left")
-      (.translateX MovingCube (* -1 moveDistance)))
-    (when (key-pressed "right")
-      (.translateX MovingCube moveDistance))
-    (when (key-pressed "up")
-      (.translateZ MovingCube (* -1 moveDistance)))
-    (when (key-pressed "down")
-      (.translateZ MovingCube moveDistance))
+    (set! walking nil)
+    (set! sword nil)
+    
+    (comment
+      (doseq [key walkingKeys]
+      (when (key-pressed key)
+        (set! walking true))))
+    
     (when (key-pressed "S")
-      (when (>= elap (+ @shoted-time shot-time-lag))
-        (create-bullet MovingCube)
-        (reset! shoted-time elap)))
-    (when (util/excist? bullet-lst)
-      (delete-shooting bullet-lst collision-mesh-lst)
-      (update-bullet bullet-lst))
-    (lk/look-at-target EnemyCube1 MovingCube rotateAngle) 
-    (lk/look-at-target EnemyCube2 MovingCube rotateAngle) 
-    ))
+      (set! sword true))
+ 
+    ;(when (not (collision-wall? colli-lst))
+      (when (key-pressed "A")
+        (.rotateOnAxis MovingCube (THREE.Vector3. 0 1 0) rotateAngle))
+      (when (key-pressed "D")
+        (mac/-= (-> MovingCube .-rotation .-y) rotateAngle))
+      (when (key-pressed "left")
+        (.translateX MovingCube (* -1 moveDistance)))
+      (when (key-pressed "right")
+        (.translateX MovingCube moveDistance))
+      (when (key-pressed "up")
+        (.translateZ MovingCube (* -1 moveDistance)))
+      (when (key-pressed "down")
+        (.translateZ MovingCube moveDistance)))
+   ;)
+    (comment
+      (when (key-pressed "S")
+        (when (>= elap (+ @shoted-time shot-time-lag))
+          (create-bullet MovingCube)
+          (reset! shoted-time elap)))
+      (when (util/excist? bullet-lst)
+        (delete-shooting bullet-lst collision-mesh-lst)
+        (update-bullet bullet-lst))
+      (lk/look-at-target EnemyCube1 MovingCube rotateAngle)
+      (lk/look-at-target EnemyCube2 MovingCube rotateAngle)
+      )
+    )
 
 (defn render []
+  (when (and human sword)
+    (ani human)) 
   (.render renderer scene camera))
 
 (defn animate []
@@ -213,3 +350,5 @@
   (update))
 
 (animate)
+
+
