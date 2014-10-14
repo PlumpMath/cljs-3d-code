@@ -47,7 +47,7 @@
         line-a (if (> main-z target-z)
                  (line-length target-z other-z)
                  (line-length target-x other-x))
-        line-b (if (> main-z target-z) 
+        line-b (if (> main-z target-z)
                  (line-length main-x other-x)
                  (line-length main-z other-z))
         line-c (pitago line-a line-b)
@@ -57,8 +57,8 @@
     (acos (/ (- (+ pow-b pow-c) pow-a) (* 2 line-b line-c)))))
 )
 
-(defn sol-rot [main-o target-o]
-  "return rotate value for look at target"
+(defn calc-rot [main-o target-o]
+  "calcurate rotate of triangle links main-o and target-o"
   (let [main-x (get-pos-x main-o)
         main-z (get-pos-z main-o)
         target-x (get-pos-x target-o)
@@ -68,7 +68,7 @@
         line-a (if (> main-z target-z)
                  (line-length target-z other-z)
                  (line-length target-x other-x))
-        line-b (if (> main-z target-z) 
+        line-b (if (> main-z target-z)
                  (line-length main-x other-x)
                  (line-length main-z other-z))
         line-c (pitago line-a line-b)
@@ -76,3 +76,8 @@
         pow-b (pow line-b 2)
         pow-c (pow line-c 2)]
     (acos (/ (- (+ pow-b pow-c) pow-a) (* 2 line-b line-c)))))
+
+(defn get-obj [scene obj-name]
+  (let [obj-lst (filter #(= (-> % .-name) obj-name)
+                        (-> scene .-children))]
+    (first obj-lst)))
