@@ -1,0 +1,28 @@
+(ns animation.core)
+
+(defn ani-vars [& {:keys [anim-offset 
+                          duration
+                          keyframes]}]
+  {:anim-offset anim-offset
+   :duration duration
+   :interpolation (/ duration keyframes)
+   :last-keyframe (atom 0)
+   :current-keyframe (atom 0)})
+
+
+(defn anim [model ani-vars]
+  (let [interpolation (:interpolation ani-vars)
+        last-keyframe (:last-keyframe ani-vars)
+        current-keyframe (:current-keyframe ani-vars)
+        time (mod (.getTime (js/Date.)) (:duration ani-vars))
+        fl-inter (.floor js/Math (/ time  interpolation))
+        keyframe   (+ fl-inter (:anim-offset ani-vars))
+        model-influ (-> model .-morphTargetInfluences)]
+    (when (not (= keyframe @current-keyframe))
+      (aset model-influ @last-keyframe 0)
+      (aset model-influ @current-keyframe 1)
+      (aset model-influ keyframe 0)
+      (reset! last-keyframe @current-keyframe)
+      (reset! current-keyframe keyframe))
+    (aset model-influ keyframe (/ (mod time interpolation ) interpolation))
+    (aset model-influ @last-keyframe (- 1 (aget model-influ keyframe)))))
