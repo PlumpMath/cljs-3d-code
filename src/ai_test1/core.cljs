@@ -1,6 +1,7 @@
 (ns ai-test1.core
   (:require [util.core :as util]
-            [look.core :as lk])
+            [look.core :as lk]
+            [animation.core :as ani])
   (:require-macros [macros.core :as mac]))
 
 (mac/vars container
@@ -108,29 +109,29 @@
 ;(.add scene city)
 
 ;animation vars
-(mac/vars (animOffset 1)  ;starting frame of animation
-          (duration 5000) ;milliseconds to complete animation
-          (keyframes 250) ;total number of animation frames
-          (interpolation (/ duration keyframes)) ;milliseconds per frame
-          (lastKeyframe 0) ;previous keyframe
-          (currentKeyframe 0))
+  (mac/vars (animOffset 1)  ;starting frame of animation
+            (duration 5000) ;milliseconds to complete animation
+            (keyframes 250) ;total number of animation frames
+            (interpolation (/ duration keyframes)) ;milliseconds per frame
+            (lastKeyframe 0) ;previous keyframe
+            (currentKeyframe 0))
 
-(defn ani [model]
-  (let [time (mod (.getTime (js/Date.)) duration)
-        fl-inter (.floor js/Math (/ time  interpolation ))
-        keyframe   (+ fl-inter animOffset)
-        model-influ (-> model .-morphTargetInfluences)]
-    (when (not (= keyframe currentKeyframe))
-      (aset model-influ lastKeyframe 0)
-      (aset model-influ currentKeyframe 1)
-      (aset model-influ keyframe 0)
-      (set! lastKeyframe currentKeyframe)
-      (set! currentKeyframe keyframe))
-    (aset model-influ keyframe (/ (mod time interpolation ) interpolation))
-    (aset model-influ lastKeyframe (- 1 (aget model-influ keyframe)))))
-    ;(when (= currentKeyframe 20)
-    ;  (set! shot nil)
-    ;  (create-ray))))
+  (defn ani [model]
+    (let [time (mod (.getTime (js/Date.)) duration)
+          fl-inter (.floor js/Math (/ time  interpolation ))
+          keyframe   (+ fl-inter animOffset)
+          model-influ (-> model .-morphTargetInfluences)]
+      (when (not (= keyframe currentKeyframe))
+        (aset model-influ lastKeyframe 0)
+        (aset model-influ currentKeyframe 1)
+        (aset model-influ keyframe 0)
+        (set! lastKeyframe currentKeyframe)
+        (set! currentKeyframe keyframe))
+      (aset model-influ keyframe (/ (mod time interpolation ) interpolation))
+      (aset model-influ lastKeyframe (- 1 (aget model-influ keyframe)))))
+  ;(when (= currentKeyframe 20)
+  ;  (set! shot nil)
+  ;  (create-ray))))
 
 (defn log [o]
   (.log js/console o))
@@ -186,6 +187,7 @@
   (doseq [i  (range  (-> materials .-length))]
     (set! (-> (aget materials i) .-morphTargets) true))
   (let [material (THREE.MeshFaceMaterial. materials)]
+    ;(set! human (THREE.Mesh. geometry material))
     (set! human (THREE.Mesh. geometry material))
     (set! (-> human .-scale) (THREE.Vector3. 1 1 1))
     (.add scene human)))
@@ -193,8 +195,9 @@
 (def jsonLoader (THREE.JSONLoader.))
 ;(.load jsonLoader  "./models/human1.js" add-model)
 ;(.load jsonLoader  "./models/human10.js" addModelToScene2)
-;(.load jsonLoader  "./models/man6.js" addModelToScene)
 (.load jsonLoader  "./models/man6.js" addModelToScene2)
+;(.load jsonLoader  "./models/sword1.js" addModelToScene2)
+
 ;(.load jsonLoader  "./models/level5.js" addLevelToScene)
 ;(.load jsonLoader  "./models/human1.js" addModelToScene)
 ;(.load jsonLoader  "./models/human2.js" add-model)
@@ -290,6 +293,9 @@
 (defn collision-wall? [colli-lst]
   (some #(= % level-model) colli-lst))
 
+(def sword-ani-vars (ani/ani-vars :anim-offset 1 :duration 5000 :keyframes 250))
+;(def walk-ani-vars (ani/ani-vars :anim-offset 251 :duration 10000 :keyframes 310))
+
 (def walking nil)
 (def walkingKeys  ["up" "down" "left" "right"])
 (def sword nil)
@@ -303,15 +309,24 @@
         shot-time-lag 0.5]
     (set! walking nil)
     (set! sword nil)
-    
+
     (comment
       (doseq [key walkingKeys]
       (when (key-pressed key)
         (set! walking true))))
     
+    (comment 
+      (when (key-pressed "I")
+      (set! walking true)))
+  
     (when (key-pressed "S")
-      (set! sword true))
- 
+      (set! sword true)
+      ;(set! (-> fakeSword .-position) 
+       ;     (-> (aget (-> human .-geometry .-bones) 61) .-pos)))
+    )
+    (when (key-pressed "C")
+      (when human (log human)))
+
     ;(when (not (collision-wall? colli-lst))
       (when (key-pressed "A")
         (.rotateOnAxis MovingCube (THREE.Vector3. 0 1 0) rotateAngle))
@@ -341,7 +356,9 @@
 
 (defn render []
   (when (and human sword)
-    (ani human)) 
+    (ani/anim human sword-ani-vars))
+  (when (and human walking)
+    (ani/anim human walk-ani-vars))
   (.render renderer scene camera))
 
 (defn animate []
