@@ -31,6 +31,7 @@
 (def collision-mesh-lst (array))
 
 
+
 ;RENDERER
 (set! renderer (THREE.WebGLRenderer. (js* "{antialias:true}")))
 (.setSize renderer SCREEN_WIDTH SCREEN_HEIGHT)
@@ -91,7 +92,7 @@
           (wireMaterial (THREE.MeshLambertMaterial. (js* "{ color: 0xffffff}")))
           (wall (THREE.Mesh. wallGeometry wallMaterial)))
 (-> wall .-position (set! (THREE.Vector3. 100 50 -100)))
-(.add scene wall)
+;(.add scene wall)
 ;(.push collision-mesh-lst wall)
 
 (def wall2 (THREE.Mesh. wallGeometry wallMaterial))
@@ -184,6 +185,8 @@
 
 
 (defn addModelToScene2 [geometry materials]
+  ;(.parseAnimations mesh)
+  ;(log (-> geometry .-firstAnimation))
   (doseq [i  (range  (-> materials .-length))]
     (set! (-> (aget materials i) .-morphTargets) true))
   (let [material (THREE.MeshFaceMaterial. materials)]
@@ -192,20 +195,54 @@
     (set! (-> human .-scale) (THREE.Vector3. 1 1 1))
     (.add scene human)))
 
+(def sword)
+(defn add-sword [geometry materials]
+  (doseq [i  (range  (-> materials .-length))]
+    (set! (-> (aget materials i) .-morphTargets) true))
+  (let [material (THREE.MeshFaceMaterial. materials)]
+    ;(set! human (THREE.Mesh. geometry material))
+    (set! sword (THREE.Mesh. geometry material))
+    (set! (-> sword .-scale) (THREE.Vector3. 1 1 1))
+    (.add scene sword)))
+
+(def ani-fps 6)
+
+(defn add-sword2 [geometry materials]
+  (doseq [i  (range  (-> materials .-length))]
+    (set! (-> (aget materials i) .-morphTargets) true))
+  (let [material (THREE.MeshFaceMaterial. materials)]
+    ;(set! human (THREE.Mesh. geometry material))
+    (.computeMorphNormals geometry)
+    (set! sword (THREE.MorphAnimMesh. geometry material))
+
+    (.parseAnimations sword)
+    (.setAnimationLabel sword "slash" 1 250)
+    (.setAnimationLabel sword "walk" 251 309)
+    ;(.playAnimation sword (-> geometry .-firstAnimation) 6)
+    ;(.playAnimation sword "slash" 6)
+    (.playAnimation sword "slash" ani-fps)
+    (set! (-> sword .-duration) 5000) ;in milliseconds
+    (set! (-> sword .-scale) (THREE.Vector3. 10 10 10))
+
+    ;(set! (-> sword .-matrixAutoUpdate) nil)
+    ;(.updateMatrix sword)
+
+    (.add scene sword)
+    (log sword)
+    ))
+
 (def jsonLoader (THREE.JSONLoader.))
-;(.load jsonLoader  "./models/human1.js" add-model)
-;(.load jsonLoader  "./models/human10.js" addModelToScene2)
-(.load jsonLoader  "./models/man6.js" addModelToScene2)
 ;(.load jsonLoader  "./models/sword1.js" addModelToScene2)
+;(.load jsonLoader  "./models/man9.js" addModelToScene2)
+;(.load jsonLoader  "./models/sword1.js" add-sword2)
+(.load jsonLoader  "./models/man9.js" add-sword2)
 
 ;(.load jsonLoader  "./models/level5.js" addLevelToScene)
-;(.load jsonLoader  "./models/human1.js" addModelToScene)
-;(.load jsonLoader  "./models/human2.js" add-model)
-;(.load jsonLoader  "./models/test9.js" add-model)
 
 (def ambientLight (THREE.AmbientLight. (js* "0x111111")))
 (.add scene ambientLight)
 
+;camera chase MovingCube
 (.add MovingCube camera)
 
 (defn key-pressed [key]
@@ -293,13 +330,14 @@
 (defn collision-wall? [colli-lst]
   (some #(= % level-model) colli-lst))
 
+(def human-ani-vars (ani/ani-vars :anim-offset 1 :duration 5000 :keyframes 250))
 (def sword-ani-vars (ani/ani-vars :anim-offset 1 :duration 5000 :keyframes 250))
 ;(def walk-ani-vars (ani/ani-vars :anim-offset 251 :duration 10000 :keyframes 310))
 
 (def walking nil)
 (def walkingKeys  ["up" "down" "left" "right"])
-(def sword nil)
-
+(def attack nil)
+(def ani-state (atom "slash"))
 (defn update []
   (let [colli-lst (collision MovingCube collision-mesh-lst)
         delta (-> clock .getDelta)
@@ -308,22 +346,38 @@
         rotateAngle  (* (/ Math.PI 2) delta)
         shot-time-lag 0.5]
     (set! walking nil)
-    (set! sword nil)
+    (set! attack nil)
+
+    (when sword
+      (when (key-pressed "Y")
+        (when (not (= @ani-state "slash"))
+          (.playAnimation sword "slash" ani-fps)
+          (reset! ani-state "slash"))
+        (.updateAnimation sword (* 10000 delta)))
+
+      (when (key-pressed "O")
+        (when (not (= @ani-state "walk"))
+          (.playAnimation sword "walk" ani-fps)
+          (reset! ani-state "walk"))
+        (.updateAnimation sword (* 10000 delta))))
 
     (comment
       (doseq [key walkingKeys]
       (when (key-pressed key)
         (set! walking true))))
-    
-    (comment 
-      (when (key-pressed "I")
-      (set! walking true)))
-  
+
+    (when (key-pressed "I")
+      (set! walking true))
+
     (when (key-pressed "S")
-      (set! sword true)
-      ;(set! (-> fakeSword .-position) 
+      (set! attack true)
+      ;(set! (-> fakeSword .-position)
        ;     (-> (aget (-> human .-geometry .-bones) 61) .-pos)))
     )
+    ;reset model
+    (when (key-pressed "R")
+      (ani/reset-model human human-ani-vars))
+
     (when (key-pressed "C")
       (when human (log human)))
 
@@ -355,10 +409,11 @@
     )
 
 (defn render []
-  (when (and human sword)
-    (ani/anim human sword-ani-vars))
-  (when (and human walking)
-    (ani/anim human walk-ani-vars))
+  (when (and human attack)
+    (ani/anim human human-ani-vars)
+    (ani/anim sword sword-ani-vars))
+  ;(when (and human walking)
+  ;  (ani/anim human walk-ani-vars))
   (.render renderer scene camera))
 
 (defn animate []
