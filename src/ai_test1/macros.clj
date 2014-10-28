@@ -1,175 +1,54 @@
-(ns macros.core)
+(ns animation.core
+  (:require-macros [macros.core :as mac]))
 
-(defmacro vars [& vars]
-  `(do
-     ~@(for [var vars]
-         (if (list? var)
-           `(def ~(first var) ~(second var))
-           `(def ~var)))))
+(defn make-load-fn [scene mesh-var animation-info first-anim camera]
+  (fn [geometry materials]
+    (doseq [i  (range  (-> materials .-length))]
+      (set! (-> (aget materials i) .-morphTargets) true))
+    (let [material (THREE.MeshFaceMaterial. materials)]
+      (reset! mesh-var (THREE.MorphAnimMesh. geometry material))
+      (set! (-> mesh-var .-duration) 5000) ;in milliseconds
+      (set! (-> mesh-var .-scale) (THREE.Vector3. 10 10 10))
+      (.log js/console (-> mesh-var .-scale))
+      ;animation
+      (doseq [ani-info animation-info]
+        (let [label (:label ani-info)
+              start (:start ani-info)
+              end (:end ani-info)]
+        (.setAnimationLabel @mesh-var label start end)))
+      (.playAnimation @mesh-var first-anim 6)
+      (.add @mesh-var camera)
+      (.log js/console @mesh-var)
+      (.lookAt camera (-> @mesh-var .-position))
+      (.add scene @mesh-var))))
 
-(defmacro += [obj num]
-  `(set! ~obj (+ ~obj ~num)))
+(defn make-chara [& {:keys [scene character-path weapon-path animation-info first-anim camera]}]
+  (let [loader (THREE.JSONLoader.)
+        chara-mesh (atom nil)
+        weapon-mesh (atom nil)
+        load-chara (make-load-fn scene chara-mesh animation-info first-anim camera)
+        load-weapon (make-load-fn scene weapon-mesh animation-info first-anim camera)]
+    (.load loader character-path load-chara)
+    (when weapon-path
+      (.load loader weapon-path load-weapon))
+    {:character-mesh chara-mesh :weapon-mesh weapon-mesh}))
 
-(defmacro -= [obj num]
-  `(set! ~obj (- ~obj ~num)))
+(defn twice-doing [chara fnc]
+  (let [chara-mesh @(:character-mesh chara)
+        weapon-mesh @(:weapon-mesh chara)]
+    (when chara-mesh
+      (fnc chara-mesh))
+    (when weapon-mesh
+      (fnc weapon-mesh))))
 
-(defn make-declare [behaviors-map]
-  (for [bh behaviors-map]
-    (let [next-bh (symbol (:name bh))]
-      `(declare ~next-bh))))
+(defn set-animation [chara label start end]
+  (twice-doing chara #(.setAnimationLabel % label start end)))
 
-(defmacro my-cond
-  [& clauses]
-  (when clauses
-    (list 'if (first (first clauses))
-          (if (first clauses)
-            (second (first clauses))
-            (throw (IllegalArgumentException.
-                    "cond requires an even number of forms")))
-          (cons 'macros.core/my-cond (next clauses)))))
+(defn play-animation [chara label fps]
+  (twice-doing chara #(.playAnimation % label fps)))
 
-(defn make-cond [state-var multi-cnd]
-  `(my-cond
-    ~@(for [cnd multi-cnd]
-        (let [end-cnd (:end-cnd cnd)
-              next-bh (symbol (:next-bh cnd))]
-          [`(~end-cnd) `(reset! ~state-var ~next-bh)]))))
+(defn update-animation [chara delta]
+  (twice-doing chara #(.updateAnimation % delta)))
 
-(defn make-when [state-var end-cnd next-bh]
-  `(when  (~end-cnd)
-     (reset! ~state-var ~(symbol next-bh))))
 
-(defn make-behaviors [args-vec state-var behaviors-map]
-  (for [bh behaviors-map]
-    (let [name (symbol (:name bh))
-          behavior (:behavior bh)
-          multi-cnd (:multi-cnd bh)
-          end-cnd (:end-cnd bh)
-          next-bh (:next-bh bh)]
-      `(defn ~name ~args-vec
-         (~behavior)
-         ~(if multi-cnd
-            (make-cond state-var multi-cnd)
-            (make-when state-var end-cnd next-bh))))))
 
-(defmacro defaction [name args-vec & behaviors]
-  `(do
-     (declare  ~(symbol (str name "-state")))
-     ~@(make-declare behaviors)
-     ~@(make-behaviors args-vec (symbol (str name "-state")) behaviors)
-     (def ~(vary-meta (symbol (str name "-state"))
-                      assoc :first-behavior (symbol (:name (first behaviors))))
-       (atom ~(symbol (:name (first behaviors)))))
-     (defn ~(symbol name) ~args-vec
-       ((deref ~(symbol (str name "-state"))) ~@args-vec))))
-
-(defmacro let-map
-  "Equivalent of (let [a 5 b (+ a 5)] {:a a :b b})."
-  [kvs]
-  (let [keys (keys (apply hash-map kvs))
-        keyword-symbols (mapcat #(vector (keyword (str %)) %) keys)]
-    `(let [~@kvs]
-       (hash-map ~@keyword-symbols))))
-
-(defn action-code []
-  '(fn [this]
-     (let [bhv (:behavior @state)
-           end-cnd (:end-cnd @state)
-           next-state (if (:next-state @state)
-                        ((:next-state @state) this))
-           multi-cnd (:multi-cnd @state)]
-       (bhv)
-       ;update state
-       (if multi-cnd
-         (loop [cnd-vec multi-cnd]
-           (if (not (first cnd-vec))
-             nil
-             (let [cnd (first cnd-vec)
-                   end-cnd (:end-cnd cnd)
-                   next-state ((:next-state cnd) this)]
-               (if (end-cnd)
-                 (reset! state next-state))
-               (recur (rest cnd-vec)))))
-         (if (end-cnd)
-           (reset! state next-state))))))
-
-(comment
-  (defmacro defenemy [name slots]
-  `(defn ~(symbol name) []
-     (let-map [~@slots
-               ~(symbol "state") (atom ~(symbol "up"))
-               ~(symbol "action") ~(action-code)]))))
-
-(defmacro defenemy [name args-vec first-state slots]
-  `(defn ~(symbol name) ~args-vec
-     (let-map [~@slots
-               ~(symbol "state") (atom ~(symbol first-state))
-               ~(symbol "action") ~(action-code)])))
-
-(defn action [obj]
-  ((:action obj) obj))
-
-(comment
-  (defenemy test-enemy [my-string] "down"
-  [print-my-str (fn [] (println my-string))
-   count (atom 0)
-   count-all (atom 0)
-   count-up (fn []
-              (reset! count (+ @count 1))
-              (reset! count-all (+ @count-all 1)))
-   count-down (fn []
-                (reset! count (- @count 1))
-                (reset! count-all (+ @count-all 1)))
-   up   {:behavior (fn []
-                     (count-up)
-                     (println "up")
-                     (print-my-str))
-         :end-cnd #(>= @count 10) :next-state :down}
-   down {:behavior (fn []
-                     (count-down)
-                     (println "down")
-                     (print-my-str))
-         :multi-cnd  [{:end-cnd #(< @count 0) :next-state :up}
-                      {:end-cnd #(>= @count-all 30) :next-state :strange}]}
-   strange {:behavior (fn [] (println "strange"))
-            :end-cnd (fn [] nil)}]))
-
- (defmacro my-case [e & clauses]
-   `(my-cond 
-     ~@(map (fn [c] `[(= ~e ~(first c)) ~(second c)])
-            clauses)))
- 
- 
- (defmacro dlambda [& ds]
-  (let [args (gensym)]
-     `(fn [& ~args]
-       (my-case (first ~args)
-         ~@(map (fn [d]
-                  `[ ~(if (= nil (first d))
-                        nil
-                        (first d))
-                     (apply (fn ~@(rest d))
-                            ~(if (= nil `(first d))
-                               args
-                               `(rest ~args)))])
-                ds)))))
- 
- (defmacro make-obj [name & ds]
-   `(def ~(symbol name) 
-      (dlambda ~@ds)))
-
- (comment 
-   (defmacro my-cond
-     [& clauses]
-     (when clauses
-       (list 'if (first (first clauses))
-             (if (first clauses)
-               (second (first clauses))
-               (throw (IllegalArgumentException.
-                       "cond requires an even number of forms")))
-             (cons 'my-cond (next clauses)))))
-
-   (def baz (dlambda (:print [] (println "hello"))
-                     (:add [v] (+ v v))
-                     (nil [] 10)))
-   )
